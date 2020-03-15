@@ -4,6 +4,19 @@ This is a discord bot for my friends and I to use. It's mainly just a pet
 project of mine and a WIP.
 Written using the discord.js API
 
+## Ideas
+
+*  ~auto role~
+*  reminder system
+*  probuilds linking
+  - need to parse for spaces, special characters
+*  mailing list?
+*  spotify playlist pool
+*  voting
+*  text commands
+*  meme database?
+*  random champion generator
+
 ## Installation and Setup
 
 1. put the folder in downloads and don't rename it (or make sure it's named dorifuto_bot)
