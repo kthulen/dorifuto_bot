@@ -7,9 +7,9 @@ Written using the discord.js API
 ## Ideas
 
 *  ~auto role~
-*  reminder system
+*  ~reminder system~
 *  probuilds linking
-  - need to parse for spaces, special characters
+    + need to parse for spaces, special characters
 *  mailing list?
 *  spotify playlist pool
 *  voting
