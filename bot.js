@@ -1,5 +1,6 @@
 const Discord = require('discord.js');
 const CronJob = require('cron').CronJob;
+const config = require('./config.json');
 
 const client = new Discord.Client();
 
@@ -88,7 +89,6 @@ client.on('message', msg => {
     if (cmd[0] === '!vote') {
         let title = 'Poll';
         if (cmd.length > 1) { title = cmd.splice(1).join(' '); }
-
     }
 });
 
@@ -105,15 +105,15 @@ client.on('message', msg => {
 })
 */
 
-// auto set new member to role (<@&108260861193265152>)
+// auto set new member to role
 // \@[rolename] to get role id
 client.on('guildMemberAdd', member => {
     const channel = member.guild.channels.cache.find(ch => ch.name === 'bot-commands');
-    member.roles.set(['108260861193265152'])
+    member.roles.set([config.general_channel])
         .then(mem => console.log(`Set new member ${mem.user.tag} as general member`))
         .catch(e => console.error(e));
 
     channel.send(`Welcome to the server, ${member}`);
 });
 
-client.login('');
+client.login(config.token);
