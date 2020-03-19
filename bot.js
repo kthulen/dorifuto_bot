@@ -11,13 +11,13 @@ client.on('ready', () => {
 });
 
 client.on('message', msg => {
-    if (msg.content === "!hi") {
-        msg.reply("Hi!");
+    if (msg.content === '!hi') {
+        msg.reply('Hi!');
     }
 });
 
 client.on('message', msg => {
-    if (msg.content === "!cmd") {
+    if (msg.content === '!cmd') {
         msg.reply(`Commands:
             1. !hi:     bot says hi
             2. !remind: dm message to all users tagged
@@ -39,28 +39,28 @@ client.on('message', msg => {
 
 // reminder system
 client.on('message', msg => {
-    let cmd = msg.content.split(" ");
-    let data = new Array (3)
-    if (cmd[0] === "!remind") {
+    let cmd = msg.content.split(/ +/);
+    let data = new Array (3);
+    if (cmd[0] === '!remind') {
         try {
             let usrs = [];
             let done = false;
             let i = 1;
             while(done === false) {
-                if (cmd[i].startsWith("<@!")) { usrs.push(cmd[i]); }
+                if (cmd[i].startsWith('<@!')) { usrs.push(cmd[i]); }
                 else { done = true; }
                 i++;
             }
             data[0] = usrs;
 
-            data[1] = cmd[i+1] + " " + cmd[i+2];
-            cmd = cmd.splice(i+3);
-            data[2] = cmd.join(" ");
+            data[1] = cmd[i + 1] + ' ' + cmd[i + 2];
+            cmd = cmd.splice(i + 3);
+            data[2] = cmd.join(' ');
 
             let date = new Date(data[1]);
             const reminder = new CronJob(date, function() {
                 for (let id of data[0]) {
-                    id = id.replace(/[<@!>]/g,"");
+                    id = id.replace(/[<@!>]/g, '');
                     client.users.fetch(id)
                         .then(u => u.createDM()
                             .then(dm => dm.send(data[2]))
@@ -70,14 +70,13 @@ client.on('message', msg => {
             });
 
             reminder.start();
-            msg.reply("You got it boss!");
+            msg.reply('You got it boss!');
         }
         catch(e) {
-            console.log("\nreminder command failed");
+            console.log('\nreminder command failed');
             console.error(e);
             msg.reply(`Mission failed. We'll get 'em next time.
-                usage: !remind [user1 user2...] [date] [time] [message]
-                example: !remind @guy @dude @homie 04/20/6969 14:00 howdy gamers`);
+                usage: !remind [@user1 @user2...] [date] [time] [message]`);
         }
     }
 });
@@ -85,10 +84,10 @@ client.on('message', msg => {
 // TODO: voting system
 // TODO: make sure each user's vote is counted once
 client.on('message', msg => {
-    let cmd = msg.content.split(" ");
-    if (cmd[0] === "!vote") {
-        let title = "Poll"
-        if (cmd.length > 1) { title = cmd.splice(1).join(" ") }
+    let cmd = msg.content.split(/ +/);
+    if (cmd[0] === '!vote') {
+        let title = 'Poll';
+        if (cmd.length > 1) { title = cmd.splice(1).join(' '); }
 
     }
 });
@@ -109,8 +108,9 @@ client.on('message', msg => {
 // auto set new member to role (<@&108260861193265152>)
 // \@[rolename] to get role id
 client.on('guildMemberAdd', member => {
+    const channel = member.guild.channels.cache.find(ch => ch.name === 'bot-commands');
     member.roles.set(['108260861193265152'])
-        .then(member => console.log(`Set new member ${member.user.tag} as general member`))
+        .then(mem => console.log(`Set new member ${mem.user.tag} as general member`))
         .catch(e => console.error(e));
 
     channel.send(`Welcome to the server, ${member}`);
