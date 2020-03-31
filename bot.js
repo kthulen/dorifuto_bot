@@ -3,6 +3,7 @@ const CronJob = require('cron').CronJob;
 const config = require('./config.json');
 
 const client = new Discord.Client();
+let voteActive = false;
 
 // TODO: check error handling, testing
 
@@ -26,7 +27,7 @@ client.on('message', msg => {
                         example: !remind @guy @dude @homie 04/20/6969 14:00 howdy gamers
             3. !vote: Set up a vote. When not specified, the title is 'Poll', the options are 'Yay' and 'Nay', and the timer is 2 minutes.
                       While a vote is ongoing, voters can add options and
-                      usage: !vote (-t title) (-o {option1} {option 2}...)
+                      usage: !vote (-s subject) (-t time) (-o {option1} {option 2}...)
                       example: !vote -s Who to kick from the island -t 5:00 -o {Son Goku} {Naruto}
                                **Voting has begun for 5:00**
                                !vote -o Dinkleburg
@@ -43,22 +44,24 @@ client.on('message', msg => {
     let cmd = msg.content.split(/ +/);
     let data = new Array (3);
     if (cmd[0] === '!remind') {
+        let users = [];
+        let done = false;
+        let i = 1;
+
+        // TODO: break up try/catch for better logging/handling
         try {
-            let usrs = [];
-            let done = false;
-            let i = 1;
             while(done === false) {
-                if (cmd[i].startsWith('<@!')) { usrs.push(cmd[i]); }
+                if (cmd[i].startsWith('<@!')) { users.push(cmd[i]); }
                 else { done = true; }
                 i++;
             }
-            data[0] = usrs;
+            data[0] = users;
 
             data[1] = cmd[i + 1] + ' ' + cmd[i + 2];
             cmd = cmd.splice(i + 3);
             data[2] = cmd.join(' ');
 
-            let date = new Date(data[1]);
+            const date = new Date(data[1]);
             const reminder = new CronJob(date, function() {
                 for (let id of data[0]) {
                     id = id.replace(/[<@!>]/g, '');
@@ -82,13 +85,100 @@ client.on('message', msg => {
     }
 });
 
+// parses a single option and returns it as a string along with the number of words in it
+function parseOptions(arr) {
+    let str = [];
+    let i = 0;
+
+    do {
+        str.push(arr[i]);
+        i++;
+    } while (arr[i - 1].endsWith('}') === false &&
+        arr[i].startsWith('-') === false &&
+        i != arr.length);
+
+    str = str.join(' ').replace(/[{}]/g, '');
+    return { string: str, count: i };
+}
+
 // TODO: voting system
-// TODO: make sure each user's vote is counted once
+// TODO: switch from using splice() to indexes like a sensible human
+// usage: !vote (-s subject) (-t time) (-o {option1} {option 2}...)
 client.on('message', msg => {
     let cmd = msg.content.split(/ +/);
     if (cmd[0] === '!vote') {
         let title = 'Poll';
-        if (cmd.length > 1) { title = cmd.splice(1).join(' '); }
+        // 5 min = 30000 ms
+        let time = 30000;
+        let poll = {
+            'yes': 0,
+            'no': 0
+        };
+
+        // probably make this a function for readability
+        if (cmd.length > 1) {
+            let str = [];
+            let obj = {};
+            let min = 0;
+            let sec = 0;
+            cmd = cmd.splice(1);
+
+            while (cmd.length != 0) {
+                console.log(cmd);
+                switch(cmd[0]) {
+                    case '-s':
+                        cmd = cmd.splice(1);
+
+                        // parse up to next option or end of command
+                        while (cmd[0].startsWith('-') === false) {
+                            str.push(cmd[0]);
+                            cmd = cmd.splice(1);
+                            if (cmd.length === 0) { break; }
+                        }
+
+                        title = str.join(' ');
+                        break;
+
+                    case '-t':
+                        min = cmd[1].split(':')[0] * 60000;
+                        sec = cmd[1].split(':')[1] * 1000;
+                        time = min + sec;
+                        cmd = cmd.splice(2);
+                        break;
+
+                    case '-o':
+                        cmd = cmd.splice(1);
+
+                        while (cmd[0].startsWith('-') === false) {
+
+                            try {
+                                obj = parseOptions(cmd);
+                            }
+                            catch {
+                                console.log('no options were specified');
+                                break;
+                            }
+                            cmd = cmd.splice(obj.count);
+                            poll[obj.string] = 0;
+                            if (cmd.length === 0) { break; }
+                        }
+
+                        delete poll.yes;
+                        delete poll.no;
+                        break;
+
+                    // NOTE: leaving this until testing is finished
+                    default:
+                        console.log('Not sure how we got here but here we are.');
+                        cmd = [];
+                }
+            }
+        }
+        console.log(`title: ${title}
+time (ms): ${time}
+options: ${JSON.stringify(poll, null, 4)}\n`);
+        // TODO: implement method to accept votes
+        // TODO: make sure each user's vote is counted once
     }
 });
 
