@@ -1,7 +1,7 @@
 # README
 
 This is a discord bot for my friends and I to use. It's mainly just a pet
-project of mine and a WIP.
+project of mine. It's still a WIP.
 Written using the discord.js API
 
 ## Ideas
@@ -16,6 +16,7 @@ Written using the discord.js API
 *  text commands
 *  meme database?
 *  random champion generator
+* ~counter~
 
 ## Installation and Setup
 

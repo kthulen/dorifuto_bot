@@ -4,7 +4,7 @@ const fs = require('fs');
 const config = require('./config.json');
 
 const client = new Discord.Client();
-const commands = ['!hi', '!cmd', '!remind', '!vote'];
+const commands = ['!hi', '!cmd', '!remind', '!vote', '!count'];
 let voteActive = false;
 
 // TODO: check error handling, testing
@@ -31,14 +31,18 @@ function checkCommands(string) {
     let hasCommand = false;
 
     for (let command of commands) {
-        let expr = new RegExp(command);
-        if (expr.test(string) === true) {
+        if (string.startsWith(command) === true) {
             hasCommand = true;
             break;
         }
     }
 
     return hasCommand;
+}
+
+// split value based on index
+function splitIndex(value, index) {
+    return [value.substring(0, index), value.substring(index)];
 }
 
 // TODO: on startup, auto role anyone who doesn't have a role
@@ -95,11 +99,16 @@ client.on('message', msg => {
     }
 });
 
-// creates and increments counters stored in a local JSON file
+// creates and increments counters stored in a local JSON file or prints all counters
 client.on('message', msg => {
-    let cmd = msg.content.split(/ +/);
+    // parsing for '!count ' (including space), so split at index 7
+    let cmd = splitIndex(msg.content.trim(), 7);
+    cmd[0] = cmd[0].substring(0, cmd[0].length - 1);
 
-    if (cmd[0] === '!count' && msg.channel.id === config.bot_testing && cmd.length != 2) {
+    if (cmd[0] === '!count' &&
+        msg.channel.id === config.bot_testing &&
+        cmd[1] != '') {
+
         let counters = {};
 
         fs.readFile('./counter.json', (err, data) => {
@@ -118,7 +127,7 @@ client.on('message', msg => {
 
             // don't write to file, just print all
             if (cmd[1] === '-a') {
-                if (counters === {}) {
+                if (Object.keys(counters).length === 0) {
                     msg.channel.send('There aren\'t any counts right now.');
                 }
                 else {
@@ -148,6 +157,9 @@ client.on('message', msg => {
                 console.log('Updated counter and saved to file.');
             });
         });
+    }
+    else if (cmd[1] === '') {
+        msg.reply('count what?');
     }
 });
 
@@ -208,7 +220,7 @@ client.on('message', msg => {
         let time = 30000;
         let poll = {
             'yes': 0,
-            'no': 0
+            'no': 0,
         };
 
         // probably make this a function for readability
