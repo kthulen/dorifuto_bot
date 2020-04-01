@@ -3,9 +3,42 @@ const CronJob = require('cron').CronJob;
 const config = require('./config.json');
 
 const client = new Discord.Client();
+const commands = ['!hi', '!cmd', '!remind', '!vote'];
 let voteActive = false;
 
 // TODO: check error handling, testing
+// NOTE: change config.bot_testing to config.bot_channel when ready to use
+
+// parses a single option and returns it as a string along with the number of words in it
+function parseOptions(arr) {
+    let str = [];
+    let i = 0;
+
+    do {
+        str.push(arr[i]);
+        i++;
+    } while (arr[i - 1].endsWith('}') === false &&
+        arr[i].startsWith('-') === false &&
+        i != arr.length);
+
+    str = str.join(' ').replace(/[{}]/g, '');
+    return { string: str, count: i };
+}
+
+// check if string contains any commands
+function checkCommands(string) {
+    let hasCommand = false;
+
+    for (let command of commands) {
+        let expr = new RegExp(command);
+        if (expr.test(string) === true) {
+            hasCommand = true;
+            break;
+        }
+    }
+
+    return hasCommand;
+}
 
 // TODO: on startup, auto role anyone who doesn't have a role
 client.on('ready', () => {
@@ -13,13 +46,14 @@ client.on('ready', () => {
 });
 
 client.on('message', msg => {
-    if (msg.content === '!hi') {
+    if (msg.content === '!hi' && msg.channel.id === config.bot_testing) {
         msg.reply('Hi!');
     }
 });
 
+// info on usage
 client.on('message', msg => {
-    if (msg.content === '!cmd') {
+    if (msg.content === '!cmd' && msg.channel.id === config.bot_testing) {
         msg.reply(`Commands:
             1. !hi:     bot says hi
             2. !remind: dm message to all users tagged
@@ -39,11 +73,21 @@ client.on('message', msg => {
     }
 });
 
+// delete message and DM user if commands are issued in the wrong channel
+client.on('message', msg => {
+    if (msg.channel.id !== config.bot_testing && checkCommands(msg.content) === true) {
+        msg.delete()
+            .then(console.log('Deleted message posted on wrong channel'))
+            .catch(console.error);
+        msg.author.send('You can only use commands in the bot-command channel!');
+    }
+});
+
 // reminder system
 client.on('message', msg => {
     let cmd = msg.content.split(/ +/);
     let data = new Array (3);
-    if (cmd[0] === '!remind') {
+    if (cmd[0] === '!remind' && msg.channel.id === config.bot_testing) {
         let users = [];
         let done = false;
         let i = 1;
@@ -85,28 +129,12 @@ client.on('message', msg => {
     }
 });
 
-// parses a single option and returns it as a string along with the number of words in it
-function parseOptions(arr) {
-    let str = [];
-    let i = 0;
-
-    do {
-        str.push(arr[i]);
-        i++;
-    } while (arr[i - 1].endsWith('}') === false &&
-        arr[i].startsWith('-') === false &&
-        i != arr.length);
-
-    str = str.join(' ').replace(/[{}]/g, '');
-    return { string: str, count: i };
-}
-
 // TODO: voting system
 // TODO: switch from using splice() to indexes like a sensible human
 // usage: !vote (-s subject) (-t time) (-o {option1} {option 2}...)
 client.on('message', msg => {
     let cmd = msg.content.split(/ +/);
-    if (cmd[0] === '!vote') {
+    if (cmd[0] === '!vote' && msg.channel.id === config.bot_testing) {
         let title = 'Poll';
         // 5 min = 30000 ms
         let time = 30000;
