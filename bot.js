@@ -1,5 +1,6 @@
 const Discord = require('discord.js');
 const CronJob = require('cron').CronJob;
+const fs = require('fs');
 const config = require('./config.json');
 
 const client = new Discord.Client();
@@ -54,7 +55,7 @@ client.on('message', msg => {
 // info on usage
 client.on('message', msg => {
     if (msg.content === '!cmd' && msg.channel.id === config.bot_testing) {
-        msg.reply(`Commands:
+        msg.channel.send(`Commands:
             1. !hi:     bot says hi
             2. !remind: dm message to all users tagged
                         usage: !remind [user1 user2...] [date] [time] [message]
@@ -63,12 +64,23 @@ client.on('message', msg => {
                       While a vote is ongoing, voters can add options and
                       usage: !vote (-s subject) (-t time) (-o {option1} {option 2}...)
                       example: !vote -s Who to kick from the island -t 5:00 -o {Son Goku} {Naruto}
-                               **Voting has begun for 5:00**
-                               !vote -o Dinkleburg
-                               ***Dinkleburg*** **added as a candidate**
-                               !vote Son Goku
-                               !vote -end
-                               **Voting ended early**
+                                **Voting has begun for 5:00**
+                                !vote -o Dinkleburg
+                                ***Dinkleburg*** **added as a candidate**
+                                !vote Son Goku
+                                !vote -end
+                                **Voting ended early**
+            4. !count: Create or increment existing counters saved to a local file.
+                       usage: !count [item or -a]
+                       example: !count deaths
+                                **deaths** count: 1
+                                !count deaths
+                                **deaths** count: 2
+                                !count save
+                                **save** count: 1
+                                !count -a
+                                **deaths** count: 2
+                                **save** count: 1
             `);
     }
 });
@@ -80,6 +92,62 @@ client.on('message', msg => {
             .then(console.log('Deleted message posted on wrong channel'))
             .catch(console.error);
         msg.author.send('You can only use commands in the bot-command channel!');
+    }
+});
+
+// creates and increments counters stored in a local JSON file
+client.on('message', msg => {
+    let cmd = msg.content.split(/ +/);
+
+    if (cmd[0] === '!count' && msg.channel.id === config.bot_testing && cmd.length != 2) {
+        let counters = {};
+
+        fs.readFile('./counter.json', (err, data) => {
+            if (err) {
+                console.log('Failed to read counter.json.');
+            }
+            else {
+                try {
+                    counters = JSON.parse(data);
+                    console.log(JSON.stringify(counters));
+                }
+                catch(e) {
+                    console.log(`${e}\nFailed to retrieve counter from file.`);
+                }
+            }
+
+            // don't write to file, just print all
+            if (cmd[1] === '-a') {
+                if (counters === {}) {
+                    msg.channel.send('There aren\'t any counts right now.');
+                }
+                else {
+                    let allCounters = '';
+                    for (let key in counters) {
+                        console.log(key, counters[key]);
+                        allCounters = allCounters.concat('**', key, '**', ' count: ', counters[key].toString(), '\n');
+                    }
+                    msg.channel.send(allCounters);
+                }
+                return;
+            }
+            else if (Object.prototype.hasOwnProperty.call(counters, cmd[1])) {
+                counters[cmd[1]]++;
+            }
+            else {
+                counters[cmd[1]] = 1;
+            }
+
+            msg.channel.send(`**${cmd[1]}** count: ${counters[cmd[1]]}`);
+
+            // overwrite file with new count
+            fs.writeFile('counter.json', JSON.stringify(counters), (err) => {
+                if (err) {
+                    console.log(err);
+                }
+                console.log('Updated counter and saved to file.');
+            });
+        });
     }
 });
 
@@ -118,12 +186,12 @@ client.on('message', msg => {
             });
 
             reminder.start();
-            msg.reply('You got it boss!');
+            msg.channel.send('You got it boss!');
         }
         catch(e) {
             console.log('\nreminder command failed');
             console.error(e);
-            msg.reply(`Mission failed. We'll get 'em next time.
+            msg.channel.send(`Mission failed. We'll get 'em next time.
                 usage: !remind [@user1 @user2...] [date] [time] [message]`);
         }
     }
