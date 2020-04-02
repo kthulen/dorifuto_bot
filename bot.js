@@ -6,21 +6,29 @@ const config = require('./config.json');
 const client = new Discord.Client();
 const commands = ['!hi', '!cmd', '!remind', '!vote', '!count'];
 let voteActive = false;
+let voteObj = {
+    title: 'Poll',
+    time: 30000,
+    options: {
+        'yes': 0,
+        'no': 0,
+    },
+};
 
 // TODO: check error handling, testing
-// NOTE: change config.bot_testing to config.bot_channel when ready to use
 
 // parses a single option and returns it as a string along with the number of words in it
-function parseOptions(arr) {
+function parseOptions(arr, index) {
     let str = [];
+    // index doubles as number of words;
     let i = 0;
 
     do {
-        str.push(arr[i]);
+        str.push(arr[index + i]);
         i++;
-    } while (arr[i - 1].endsWith('}') === false &&
-        arr[i].startsWith('-') === false &&
-        i != arr.length);
+    } while (arr[index + i - 1].endsWith('}') === false &&
+        arr[index + i].startsWith('-') === false &&
+        i != arr.length - index);
 
     str = str.join(' ').replace(/[{}]/g, '');
     return { string: str, count: i };
@@ -40,9 +48,29 @@ function checkCommands(string) {
     return hasCommand;
 }
 
-// split value based on index
+// split value at index
 function splitIndex(value, index) {
     return [value.substring(0, index), value.substring(index)];
+}
+
+// return string containing voteObj's values used to announce that voting has begun
+function voteAnnounce() {
+    const time = new Date(voteObj.time);
+    const min = time.getUTCMinutes();
+    let sec = time.getUTCSeconds();
+    let options = '';
+
+    if (sec < 10) {
+        sec = '0' + sec;
+    }
+
+    for (let option of Object.keys(voteObj.options)) {
+        options = options.concat(option, '\n', '    ');
+    }
+
+    return `**Vote for ${voteObj.title} will last for ${min}:${sec}.**
+    **options:**
+    ${options}`;
 }
 
 // TODO: on startup, auto role anyone who doesn't have a role
@@ -56,6 +84,76 @@ client.on('message', msg => {
     }
 });
 
+// set voting values back to default
+function defaultVote() {
+    voteObj.title = 'Poll';
+    voteObj.time = 30000;
+    voteObj.options = {
+        'yes': 0,
+        'no': 0,
+    };
+}
+
+// go through input and load into voteObj
+function initVote(input) {
+    let len = input.length;
+    let obj = {};
+    let index = 1;
+
+    while (index < input.length) {
+        // parse up to next option or end of command
+        switch(input[index]) {
+            case '-s':
+                index++;
+                voteObj.title = '';
+                while (input[index].startsWith('-') === false) {
+                    voteObj.title += input[index] + ' ';
+                    index++;
+                    if (index >= len) { break; }
+                }
+                voteObj.title = voteObj.title.trim();
+                break;
+
+            case '-t':
+                index++;
+                voteObj.time = input[index].split(':')[0] * 60000 +
+                    input[index].split(':')[1] * 1000;
+                index++;
+                break;
+
+            case '-o':
+                index++;
+                while (input[index].startsWith('-') === false) {
+
+                    try {
+                        obj = parseOptions(input, index);
+                    }
+                    catch {
+                        console.log('no options were specified');
+                        break;
+                    }
+                    index += obj.count;
+                    // set count of option to 0
+                    voteObj.options[obj.string] = 0;
+                    if (index >= len) { break; }
+                }
+
+                // user entered options, so remove default options
+                delete voteObj.options.yes;
+                delete voteObj.options.no;
+                break;
+
+            // NOTE: leaving this until testing is finished
+            default:
+                console.log('Not sure how we got here but here we are.');
+                input = [];
+        }
+    }
+    console.log(`title: ${voteObj.title}
+time (ms): ${voteObj.time}
+options: ${JSON.stringify(voteObj.options, null, 4)}\n`);
+}
+
 // info on usage
 client.on('message', msg => {
     if (msg.content === '!cmd' && msg.channel.id === config.bot_testing) {
@@ -68,7 +166,8 @@ client.on('message', msg => {
                       While a vote is ongoing, voters can add options and
                       usage: !vote (-s subject) (-t time) (-o {option1} {option 2}...)
                       example: !vote -s Who to kick from the island -t 5:00 -o {Son Goku} {Naruto}
-                                **Voting has begun for 5:00**
+                                **Vote for Who to kick from the island will last for 5:00.**
+                                **options:** ...
                                 !vote -o Dinkleburg
                                 ***Dinkleburg*** **added as a candidate**
                                 !vote Son Goku
@@ -99,6 +198,7 @@ client.on('message', msg => {
     }
 });
 
+// counter system
 // creates and increments counters stored in a local JSON file or prints all counters
 client.on('message', msg => {
     // parsing for '!count ' (including space), so split at index 7
@@ -158,7 +258,7 @@ client.on('message', msg => {
             });
         });
     }
-    else if (cmd[1] === '') {
+    else if (cmd[0] === '!count' && cmd[1] === '') {
         msg.reply('count what?');
     }
 });
@@ -174,7 +274,7 @@ client.on('message', msg => {
 
         // TODO: break up try/catch for better logging/handling
         try {
-            while(done === false) {
+            while(!done) {
                 if (cmd[i].startsWith('<@!')) { users.push(cmd[i]); }
                 else { done = true; }
                 i++;
@@ -210,81 +310,25 @@ client.on('message', msg => {
 });
 
 // TODO: voting system
-// TODO: switch from using splice() to indexes like a sensible human
 // usage: !vote (-s subject) (-t time) (-o {option1} {option 2}...)
 client.on('message', msg => {
     let cmd = msg.content.split(/ +/);
     if (cmd[0] === '!vote' && msg.channel.id === config.bot_testing) {
-        let title = 'Poll';
-        // 5 min = 30000 ms
-        let time = 30000;
-        let poll = {
-            'yes': 0,
-            'no': 0,
-        };
-
-        // probably make this a function for readability
-        if (cmd.length > 1) {
-            let str = [];
-            let obj = {};
-            let min = 0;
-            let sec = 0;
-            cmd = cmd.splice(1);
-
-            while (cmd.length != 0) {
-                console.log(cmd);
-                switch(cmd[0]) {
-                    case '-s':
-                        cmd = cmd.splice(1);
-
-                        // parse up to next option or end of command
-                        while (cmd[0].startsWith('-') === false) {
-                            str.push(cmd[0]);
-                            cmd = cmd.splice(1);
-                            if (cmd.length === 0) { break; }
-                        }
-
-                        title = str.join(' ');
-                        break;
-
-                    case '-t':
-                        min = cmd[1].split(':')[0] * 60000;
-                        sec = cmd[1].split(':')[1] * 1000;
-                        time = min + sec;
-                        cmd = cmd.splice(2);
-                        break;
-
-                    case '-o':
-                        cmd = cmd.splice(1);
-
-                        while (cmd[0].startsWith('-') === false) {
-
-                            try {
-                                obj = parseOptions(cmd);
-                            }
-                            catch {
-                                console.log('no options were specified');
-                                break;
-                            }
-                            cmd = cmd.splice(obj.count);
-                            poll[obj.string] = 0;
-                            if (cmd.length === 0) { break; }
-                        }
-
-                        delete poll.yes;
-                        delete poll.no;
-                        break;
-
-                    // NOTE: leaving this until testing is finished
-                    default:
-                        console.log('Not sure how we got here but here we are.');
-                        cmd = [];
-                }
-            }
+        if (!voteActive && cmd.length > 1) {
+            // set up vote
+            initVote(cmd);
+            msg.channel.send(voteAnnounce());
         }
-        console.log(`title: ${title}
-time (ms): ${time}
-options: ${JSON.stringify(poll, null, 4)}\n`);
+        else if (!voteActive) {
+            console.log(`title: ${voteObj.title}
+time (ms): ${voteObj.time}
+options: ${JSON.stringify(voteObj.options, null, 4)}\n`);
+            msg.channel.send(voteAnnounce());
+        }
+        else {
+            // cast vote
+            // add option
+        }
         // TODO: implement method to accept votes
         // TODO: make sure each user's vote is counted once
     }
