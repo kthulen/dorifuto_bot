@@ -11,8 +11,7 @@ Written using the discord.js API
 *  probuilds linking
     + need to parse for spaces, special characters
 *  mailing list?
-*  spotify playlist pool
-*  voting
+*  ~voting~
 *  text commands
 *  meme database?
 *  random champion generator

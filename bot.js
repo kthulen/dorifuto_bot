@@ -6,6 +6,8 @@ const config = require('./config.json');
 const client = new Discord.Client();
 const commands = ['!hi', '!cmd', '!remind', '!vote', '!count'];
 let voteActive = false;
+// needs to be global in case user decides to end vote early
+let voteJob;
 let voteObj = {
     title: 'Poll',
     time: 30000,
@@ -14,8 +16,42 @@ let voteObj = {
         'no': 0,
     },
 };
+// store voter id and option so each person can only vote for one option
+let voters = {};
 
 // TODO: check error handling, testing
+
+// check if string contains any commands
+function checkCommands(string) {
+    let hasCommand = false;
+
+    for (const command of commands) {
+        if (string.startsWith(command) === true) {
+            hasCommand = true;
+            break;
+        }
+    }
+
+    return hasCommand;
+}
+
+// split value at index
+function splitIndex(value, index) {
+    return [value.substring(0, index), value.substring(index)];
+}
+
+// check if input is a valid option in voteObj.options
+function isOption(input) {
+    let isValid = false;
+
+    for (const option in voteObj.options) {
+        if (option === input) {
+            isValid = true;
+        }
+    }
+
+    return isValid;
+}
 
 // parses a single option and returns it as a string along with the number of words in it
 function parseOptions(arr, index) {
@@ -32,25 +68,6 @@ function parseOptions(arr, index) {
 
     str = str.join(' ').replace(/[{}]/g, '');
     return { string: str, count: i };
-}
-
-// check if string contains any commands
-function checkCommands(string) {
-    let hasCommand = false;
-
-    for (let command of commands) {
-        if (string.startsWith(command) === true) {
-            hasCommand = true;
-            break;
-        }
-    }
-
-    return hasCommand;
-}
-
-// split value at index
-function splitIndex(value, index) {
-    return [value.substring(0, index), value.substring(index)];
 }
 
 // return string containing voteObj's values used to announce that voting has begun
@@ -79,7 +96,7 @@ client.on('ready', () => {
 });
 
 client.on('message', msg => {
-    if (msg.content === '!hi' && msg.channel.id === config.bot_testing) {
+    if (msg.content === '!hi' && msg.channel.id === config.bot_channel) {
         msg.reply('Hi!');
     }
 });
@@ -99,6 +116,7 @@ function initVote(input) {
     let len = input.length;
     let obj = {};
     let index = 1;
+    let success = true;
 
     while (index < input.length) {
         // parse up to next option or end of command
@@ -106,11 +124,13 @@ function initVote(input) {
             case '-s':
                 index++;
                 voteObj.title = '';
+
                 while (input[index].startsWith('-') === false) {
                     voteObj.title += input[index] + ' ';
                     index++;
                     if (index >= len) { break; }
                 }
+
                 voteObj.title = voteObj.title.trim();
                 break;
 
@@ -123,6 +143,7 @@ function initVote(input) {
 
             case '-o':
                 index++;
+
                 while (input[index].startsWith('-') === false) {
 
                     try {
@@ -132,6 +153,7 @@ function initVote(input) {
                         console.log('no options were specified');
                         break;
                     }
+
                     index += obj.count;
                     // set count of option to 0
                     voteObj.options[obj.string] = 0;
@@ -145,10 +167,60 @@ function initVote(input) {
 
             // NOTE: leaving this until testing is finished
             default:
-                console.log('Not sure how we got here but here we are.');
                 input = [];
+                success = false;
         }
     }
+    return success;
+}
+
+function calcVoteResults(channel) {
+    let winner = [];
+    let winnerCount = 0;
+
+    // determine winner/tie
+    for (const option in voteObj.options) {
+        if (voteObj.options[option] > winnerCount) {
+            winner = [option];
+            winnerCount = voteObj.options[option];
+        }
+        else if (voteObj.options[option] === winnerCount && winnerCount != 0) {
+            winner.push(option);
+        }
+    }
+
+    channel.send('Voting has ended.');
+
+    // print results
+    if (winner.length > 1) {
+        let winnerString = 'Tie between:';
+        for (const option of winner) {
+            winnerString += '\n' + option;
+        }
+        channel.send(winnerString);
+    }
+    else if (winner.length === 0) {
+        channel.send('No one voted, so nothing won!');
+    }
+    else {
+        channel.send(`${winner[0]} won.`);
+    }
+
+    voteActive = false;
+    defaultVote();
+}
+
+// start accepting votes
+function voteStart(channel) {
+    const date = new Date(Date.now() + voteObj.time);
+    voteJob = new CronJob(date, function() {
+        // on voting finish
+        calcVoteResults(channel);
+    });
+
+    voteActive = true;
+    voteJob.start();
+    channel.send(voteAnnounce());
     console.log(`title: ${voteObj.title}
 time (ms): ${voteObj.time}
 options: ${JSON.stringify(voteObj.options, null, 4)}\n`);
@@ -156,23 +228,23 @@ options: ${JSON.stringify(voteObj.options, null, 4)}\n`);
 
 // info on usage
 client.on('message', msg => {
-    if (msg.content === '!cmd' && msg.channel.id === config.bot_testing) {
+    if (msg.content === '!cmd' && msg.channel.id === config.bot_channel) {
         msg.channel.send(`Commands:
             1. !hi:     bot says hi
             2. !remind: dm message to all users tagged
                         usage: !remind [user1 user2...] [date] [time] [message]
                         example: !remind @guy @dude @homie 04/20/6969 14:00 howdy gamers
             3. !vote: Set up a vote. When not specified, the title is 'Poll', the options are 'Yay' and 'Nay', and the timer is 2 minutes.
-                      While a vote is ongoing, voters can add options and
-                      usage: !vote (-s subject) (-t time) (-o {option1} {option 2}...)
+                      While a vote is ongoing, voters can either cast a vote or end the vote early.
+                      usage: !vote (-s subject) (-t time) (-o {option1} {option 2}...) (-end)
                       example: !vote -s Who to kick from the island -t 5:00 -o {Son Goku} {Naruto}
                                 **Vote for Who to kick from the island will last for 5:00.**
                                 **options:** ...
-                                !vote -o Dinkleburg
-                                ***Dinkleburg*** **added as a candidate**
                                 !vote Son Goku
+                                *Vote accepted.*
                                 !vote -end
-                                **Voting ended early**
+                                *Voting has ended.*
+                                *Son Goku won.*
             4. !count: Create or increment existing counters saved to a local file.
                        usage: !count [item or -a]
                        example: !count deaths
@@ -190,7 +262,7 @@ client.on('message', msg => {
 
 // delete message and DM user if commands are issued in the wrong channel
 client.on('message', msg => {
-    if (msg.channel.id !== config.bot_testing && checkCommands(msg.content) === true) {
+    if (msg.channel.id !== config.bot_channel && checkCommands(msg.content) === true) {
         msg.delete()
             .then(console.log('Deleted message posted on wrong channel'))
             .catch(console.error);
@@ -206,7 +278,7 @@ client.on('message', msg => {
     cmd[0] = cmd[0].substring(0, cmd[0].length - 1);
 
     if (cmd[0] === '!count' &&
-        msg.channel.id === config.bot_testing &&
+        msg.channel.id === config.bot_channel &&
         cmd[1] != '') {
 
         let counters = {};
@@ -232,10 +304,12 @@ client.on('message', msg => {
                 }
                 else {
                     let allCounters = '';
-                    for (let key in counters) {
+
+                    for (const key in counters) {
                         console.log(key, counters[key]);
                         allCounters = allCounters.concat('**', key, '**', ' count: ', counters[key].toString(), '\n');
                     }
+
                     msg.channel.send(allCounters);
                 }
                 return;
@@ -267,7 +341,8 @@ client.on('message', msg => {
 client.on('message', msg => {
     let cmd = msg.content.split(/ +/);
     let data = new Array (3);
-    if (cmd[0] === '!remind' && msg.channel.id === config.bot_testing) {
+
+    if (cmd[0] === '!remind' && msg.channel.id === config.bot_channel) {
         let users = [];
         let done = false;
         let i = 1;
@@ -275,10 +350,15 @@ client.on('message', msg => {
         // TODO: break up try/catch for better logging/handling
         try {
             while(!done) {
-                if (cmd[i].startsWith('<@!')) { users.push(cmd[i]); }
-                else { done = true; }
+                if (cmd[i].startsWith('<@!')) {
+                    users.push(cmd[i]);
+                }
+                else {
+                    done = true;
+                }
                 i++;
             }
+
             data[0] = users;
 
             data[1] = cmd[i + 1] + ' ' + cmd[i + 2];
@@ -309,28 +389,46 @@ client.on('message', msg => {
     }
 });
 
-// TODO: voting system
-// usage: !vote (-s subject) (-t time) (-o {option1} {option 2}...)
+// voting system
+// usage: !vote (-s subject) (-t time) (-o {option1} {option 2}...) (-end)
 client.on('message', msg => {
     let cmd = msg.content.split(/ +/);
-    if (cmd[0] === '!vote' && msg.channel.id === config.bot_testing) {
-        if (!voteActive && cmd.length > 1) {
-            // set up vote
-            initVote(cmd);
-            msg.channel.send(voteAnnounce());
+    let option = msg.content.split(/ +/).splice(1).join(' ');
+
+    if (cmd[0] === '!vote' && msg.channel.id === config.bot_channel) {
+        if (!voteActive && cmd.length > 0) {
+            // set up vote with user settings
+            if (initVote(cmd)) {
+                voteStart(msg.channel);
+            }
+            else {
+                msg.channel.send('Invalid syntax. There is no active vote.');
+            }
         }
         else if (!voteActive) {
-            console.log(`title: ${voteObj.title}
-time (ms): ${voteObj.time}
-options: ${JSON.stringify(voteObj.options, null, 4)}\n`);
-            msg.channel.send(voteAnnounce());
+            // start the default vote
+            voteStart(msg.channel);
         }
+        else if (option === '-end') {
+            calcVoteResults(msg.channel);
+            voteJob.stop();
+        }
+        else if (!isOption(option)) {
+            msg.reply('Invalid option.');
+        }
+        // user has voted, so retract old vote and cast new vote
+        else if (Object.prototype.hasOwnProperty.call(voters, msg.author.id)) {
+            voteObj.options[voters[msg.author.id]]--;
+            voteObj.options[option]++;
+            voters[msg.author.id] = option;
+            msg.channel.send('Vote changed and accepted.');
+        }
+        // user has not voted, so cast vote
         else {
-            // cast vote
-            // add option
+            voteObj.options[option]++;
+            voters[msg.author.id] = option;
+            msg.channel.send('Vote accepted.');
         }
-        // TODO: implement method to accept votes
-        // TODO: make sure each user's vote is counted once
     }
 });
 
