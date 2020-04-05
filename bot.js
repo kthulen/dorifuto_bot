@@ -96,7 +96,7 @@ client.on('ready', () => {
 });
 
 client.on('message', msg => {
-    if (msg.content === '!hi' && msg.channel.id === config.bot_channel) {
+    if (msg.content === '!hi' && (msg.channel.id === config.bot_channel || msg.channel.id === config.bot_testing)) {
         msg.reply('Hi!');
     }
 });
@@ -228,7 +228,7 @@ options: ${JSON.stringify(voteObj.options, null, 4)}\n`);
 
 // info on usage
 client.on('message', msg => {
-    if (msg.content === '!cmd' && msg.channel.id === config.bot_channel) {
+    if (msg.content === '!cmd' && (msg.channel.id === config.bot_channel || msg.channel.id === config.bot_testing)) {
         msg.channel.send(`Commands:
             1. !hi:     bot says hi
             2. !remind: dm message to all users tagged
@@ -262,7 +262,7 @@ client.on('message', msg => {
 
 // delete message and DM user if commands are issued in the wrong channel
 client.on('message', msg => {
-    if (msg.channel.id !== config.bot_channel && checkCommands(msg.content) === true) {
+    if (msg.channel.id !== config.bot_channel && msg.channel.id !== config.bot_testing && checkCommands(msg.content) === true) {
         msg.delete()
             .then(console.log('Deleted message posted on wrong channel'))
             .catch(console.error);
@@ -278,7 +278,7 @@ client.on('message', msg => {
     cmd[0] = cmd[0].substring(0, cmd[0].length - 1);
 
     if (cmd[0] === '!count' &&
-        msg.channel.id === config.bot_channel &&
+        (msg.channel.id === config.bot_channel || msg.channel.id === config.bot_testing) &&
         cmd[1] != '') {
 
         let counters = {};
@@ -342,7 +342,7 @@ client.on('message', msg => {
     let cmd = msg.content.split(/ +/);
     let data = new Array (3);
 
-    if (cmd[0] === '!remind' && msg.channel.id === config.bot_channel) {
+    if (cmd[0] === '!remind' && (msg.channel.id === config.bot_channel || msg.channel.id === config.bot_testing)) {
         let users = [];
         let done = false;
         let i = 1;
@@ -395,7 +395,7 @@ client.on('message', msg => {
     let cmd = msg.content.split(/ +/);
     let option = msg.content.split(/ +/).splice(1).join(' ');
 
-    if (cmd[0] === '!vote' && msg.channel.id === config.bot_channel) {
+    if (cmd[0] === '!vote' && (msg.channel.id === config.bot_channel || msg.channel.id === config.bot_testing)) {
         if (!voteActive && cmd.length > 0) {
             // set up vote with user settings
             if (initVote(cmd)) {
