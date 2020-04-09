@@ -2,8 +2,8 @@ const Discord = require('discord.js');
 const CronJob = require('cron').CronJob;
 const fs = require('fs');
 const config = require('./config.json');
-
 const client = new Discord.Client();
+
 const commands = ['!hi', '!cmd', '!remind', '!vote', '!count'];
 let voteActive = false;
 // needs to be global in case user decides to end vote early
@@ -19,7 +19,15 @@ let voteObj = {
 // store voter id and option so each person can only vote for one option
 let voters = {};
 
-// TODO: check error handling, testing
+/*
+    TODO: error handling, try/catch where needed
+    TODO: put function in separate files for modularity
+            <https://github.com/HarutoHiroki/Discord.js-Bot>
+    TODO: parse commands with commander/yargs package
+            <https://github.com/tj/commander.js/>
+            <https://github.com/yargs/yargs>
+    TODO: voting probably needs to be async but im dumb
+*/
 
 // check if string contains any commands
 function checkCommands(string) {
@@ -70,6 +78,7 @@ function parseOptions(arr, index) {
     return { string: str, count: i };
 }
 
+// TODO: make the announcement an embed
 // return string containing voteObj's values used to announce that voting has begun
 function voteAnnounce() {
     const time = new Date(voteObj.time);
