@@ -1,7 +1,7 @@
 const Discord = require('discord.js');
 const CronJob = require('cron').CronJob;
 const fs = require('fs');
-const config = require('./config.json');
+const config = require('./assets/config.json');
 const client = new Discord.Client();
 
 const commands = ['!hi', '!cmd', '!remind', '!vote', '!count'];
@@ -26,7 +26,8 @@ let voters = {};
     TODO: parse commands with commander/yargs package
             <https://github.com/tj/commander.js/>
             <https://github.com/yargs/yargs>
-    TODO: voting probably needs to be async but im dumb
+    TODO: scrap voting and redo it with msg.awaitReactions()
+    TODO: ignore messages from bots
 */
 
 // check if string contains any commands
@@ -292,7 +293,7 @@ client.on('message', msg => {
 
         let counters = {};
 
-        fs.readFile('./counter.json', (err, data) => {
+        fs.readFile('./data/counter.json', (err, data) => {
             if (err) {
                 console.log('Failed to read counter.json.');
             }
@@ -333,7 +334,7 @@ client.on('message', msg => {
             msg.channel.send(`**${cmd[1]}** count: ${counters[cmd[1]]}`);
 
             // overwrite file with new count
-            fs.writeFile('counter.json', JSON.stringify(counters), (err) => {
+            fs.writeFile('./data/counter.json', JSON.stringify(counters), (err) => {
                 if (err) {
                     console.log(err);
                 }
@@ -440,19 +441,6 @@ client.on('message', msg => {
         }
     }
 });
-
-
-/*
-// test for making the bot change someone's role
-// bot must be above whoever it wants to give a role
-client.on('message', msg => {
-    if (msg.content === '!role') {
-        msg.member.roles.set(['108260861193265152'])
-            .then(msg => console.log(`Set new member ${msg.member.user.tag} as general member`))
-            .catch(console.error);
-    }
-})
-*/
 
 // auto set new member to role
 // \@[rolename] to get role id
